@@ -3,8 +3,12 @@ pragma solidity ^0.8.0;
 
 import 'hardhat/console.sol';
 import '@chainlink/contracts/src/v0.8/KeeperCompatible.sol';
+import '@openzeppelin/contracts/utils/Counters.sol';
 
 contract LuckyDraw is KeeperCompatible {
+  using Counters for Counters.Counter;
+  Counters.Counter private _luckyDrawIdCounter;
+
   enum LUCKYDRAW_STATE {
     OPEN,
     CLOSED,
@@ -14,6 +18,9 @@ contract LuckyDraw is KeeperCompatible {
   address payable[] public players;
   uint256 public luckyDrawId;
 
+  // .01 ETH
+  uint256 public MINIMUM = 1000000000000000;
+
   /**
    * Use an interval in seconds and a timestamp to slow execution of Upkeep
    */
@@ -22,7 +29,8 @@ contract LuckyDraw is KeeperCompatible {
   uint256 public expiredTimeStamp;
 
   constructor(uint256 updateInterval) {
-    luckyDrawId = 1;
+    luckyDrawId = _luckyDrawIdCounter.current();
+
     luckyDrawState = LUCKYDRAW_STATE.CLOSED;
 
     interval = updateInterval;
@@ -35,8 +43,18 @@ contract LuckyDraw is KeeperCompatible {
       luckyDrawState == LUCKYDRAW_STATE.CLOSED,
       "can't start a new lucky draw yet"
     );
+    _luckyDrawIdCounter.increment();
+    luckyDrawId = _luckyDrawIdCounter.current();
+
     luckyDrawState = LUCKYDRAW_STATE.OPEN;
     expiredTimeStamp = block.timestamp + duration;
+  }
+
+  // enter the lucky draw
+  function enter() public payable {
+    assert(msg.value == MINIMUM);
+    assert(luckyDrawState == LUCKYDRAW_STATE.OPEN);
+    players.push(payable(msg.sender));
   }
 
   function checkUpkeep(bytes calldata checkData)
